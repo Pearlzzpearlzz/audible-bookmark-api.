@@ -1,10 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from gtts import gTTS
-import json, os
+import json, os, datetime
 
+# Initialize FastAPI
 app = FastAPI()
 
+# Bookmark storage file
 BOOKMARK_FILE = "bookmarks.json"
 
 # Make sure bookmark storage exists
@@ -21,49 +23,55 @@ class SaveRequest(BaseModel):
 class ReadRequest(BaseModel):
     user: str
     book: str
-    text: str
-    position: int
 
-# --- Helpers ---
-def save_bookmark(user, book, position):
+# Middleware for logging all requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    user_agent = request.headers.get("user-agent", "unknown")
+    path = request.url.path
+    timestamp = datetime.datetime.now().isoformat()
+
+    # Print to Render logs
+    print(f"[{timestamp}] User Agent: {user_agent} | Path: {path}")
+
+    response = await call_next(request)
+    return response
+
+# Save bookmark
+@app.post("/save")
+def save_bookmark(req: SaveRequest):
     with open(BOOKMARK_FILE, "r") as f:
-        data = json.load(f)
-    if user not in data:
-        data[user] = {}
-    data[user][book] = position
+        bookmarks = json.load(f)
+
+    key = f"{req.user}_{req.book}"
+    bookmarks[key] = req.position
+
     with open(BOOKMARK_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(bookmarks, f)
 
-def load_bookmark(user, book):
+    return {"message": "Bookmark saved", "key": key, "position": req.position}
+
+# Get bookmark
+@app.post("/get")
+def get_bookmark(req: ReadRequest):
     with open(BOOKMARK_FILE, "r") as f:
-        data = json.load(f)
-    return data.get(user, {}).get(book, 0)
+        bookmarks = json.load(f)
 
-# --- Endpoints ---
-@app.post("/saveBookmark")
-def save(req: SaveRequest):
-    save_bookmark(req.user, req.book, req.position)
-    return {"status": "saved", "user": req.user, "book": req.book, "position": req.position}
+    key = f"{req.user}_{req.book}"
+    position = bookmarks.get(key)
 
-@app.get("/getBookmark/{user}/{book}")
-def get(user: str, book: str):
-    position = load_bookmark(user, book)
-    return {"user": user, "book": book, "last_position": position}
+    if position is None:
+        return {"message": "No bookmark found"}
 
-@app.post("/read")
-def read(req: ReadRequest):
-    # Generate audio for given text
-    tts = gTTS(req.text)
-    filename = f"{req.user}_{req.book}_{req.position}.mp3"
+    return {"user": req.user, "book": req.book, "position": position}
+
+# Generate speech
+@app.post("/speak")
+def speak_text(req: ReadRequest):
+    text = f"{req.user}, your last position in {req.book} is saved."
+    tts = gTTS(text)
+    filename = f"{req.user}_{req.book}.mp3"
     tts.save(filename)
-    audio_url = f"/audio/{filename}"
-    return {
-        "user": req.user,
-        "book": req.book,
-        "position": req.position,
-        "audio_url": audio_url
-    }
 
-# Serve audio files
-from fastapi.staticfiles import StaticFiles
-app.mount("/audio", StaticFiles(directory="."), name="audio")
+    return {"message": "Audio generated", "file": filename}
+
