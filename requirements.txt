@@ -3,18 +3,7 @@ uvicorn
 sqlalchemy
 psycopg2-binary
 gtts
-python-dotenv
-fastapi → the API framework
 
-uvicorn → runs FastAPI
-
-sqlalchemy → database ORM (clean, extendable)
-
-psycopg2-binary → PostgreSQL driver
-
-gtts → text-to-speech
-
-python-dotenv → lets you load environment variables locally (makes development easier)
 
 
 
