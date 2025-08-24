@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 from datetime import datetime
 from gtts import gTTS
+from fastapi.responses import FileResponse
 
 # ======================
 # Database setup
@@ -68,8 +69,7 @@ def get_bookmark(req: ReadRequest):
 
 @app.post("/speak")
 def speak_text(req: SpeakRequest):
-    tts = gTTS(req.text)
     filename = f"{req.user}_{req.book}_spoken.mp3"
+    tts = gTTS(req.text)
     tts.save(filename)
-    return {"message": f"Audio saved as {filename}"}
-
+    return FileResponse(filename, media_type="audio/mpeg", filename=filename)
