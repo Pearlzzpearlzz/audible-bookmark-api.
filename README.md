@@ -1,6 +1,7 @@
-# Audible Bookmark API
+#  Spoken API
+ 
 
-This is a FastAPI project that provides audible bookmarking for digital text.
+This is a Fast API project that provides audible bookmarking for digital text.
 
 ## Features
 - Save bookmark: store a user's last read position in a book.
