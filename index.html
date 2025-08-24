@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Spoken Bookmark</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+    button { font-size: 24px; padding: 20px; margin: 10px; }
+  </style>
+</head>
+<body>
+  <h1>📖 Spoken Bookmark</h1>
+  <p>Press the <b>spacebar</b> or tap the button below to toggle Stop/Resume.</p>
+
+  <button id="toggleButton">⏯️ Stop / Resume</button>
+
+  <script>
+    let isReading = true; // Start as reading
+    const user = "john";   // Replace with real username
+    const book = "Bible";  // Replace with real book
+
+    function sendCommand(command) {
+      fetch("https://audible-bookmark-api.onrender.com/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: user, book: book, command: command })
+      })
+      .then(res => {
+        if (res.ok) {
+          console.log("Command sent:", command);
+        } else {
+          console.error("Failed to send:", command);
+        }
+      });
+    }
+
+    function toggleCommand() {
+      if (isReading) {
+        sendCommand("STOP");
+        isReading = false;
+      } else {
+        sendCommand("RESUME");
+        isReading = true;
+      }
+    }
+
+    // Button click
+    document.getElementById("toggleButton").addEventListener("click", toggleCommand);
+
+    // Spacebar press
+    document.addEventListener("keydown", function(event) {
+      if (event.code === "Space") {
+        toggleCommand();
+        event.preventDefault(); // prevent page scroll
+      }
+    });
+  </script>
+</body>
+</html>
