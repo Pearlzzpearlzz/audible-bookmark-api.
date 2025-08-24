@@ -1,20 +1,23 @@
-from fastapi import FastAPI, Request
+
+from fastapi import FastAPI
 from pydantic import BaseModel
 from gtts import gTTS
-import json, os, datetime
+import json, os
+from datetime import datetime
 
-# Initialize FastAPI
 app = FastAPI()
 
-# Bookmark storage file
+# Storage file
 BOOKMARK_FILE = "bookmarks.json"
 
-# Make sure bookmark storage exists
+# Make sure bookmarks file exists
 if not os.path.exists(BOOKMARK_FILE):
     with open(BOOKMARK_FILE, "w") as f:
         json.dump({}, f)
 
-# Request models
+# ------------------------------
+# Models
+# ------------------------------
 class SaveRequest(BaseModel):
     user: str
     book: str
@@ -24,40 +27,34 @@ class ReadRequest(BaseModel):
     user: str
     book: str
 
-# Middleware for logging all requests
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    user_agent = request.headers.get("user-agent", "unknown")
-    path = request.url.path
-    timestamp = datetime.datetime.now().isoformat()
+class SpeakRequest(BaseModel):
+    text: str
 
-    # Print to Render logs
-    print(f"[{timestamp}] User Agent: {user_agent} | Path: {path}")
+# ------------------------------
+# Endpoints
+# ------------------------------
 
-    response = await call_next(request)
-    return response
-
-# Save bookmark
 @app.post("/save")
 def save_bookmark(req: SaveRequest):
+    """Save a bookmark for a user + book"""
     with open(BOOKMARK_FILE, "r") as f:
         bookmarks = json.load(f)
 
-    key = f"{req.user}_{req.book}"
-    bookmarks[key] = req.position
+    bookmarks[f"{req.user}:{req.book}"] = req.position
 
     with open(BOOKMARK_FILE, "w") as f:
         json.dump(bookmarks, f)
 
-    return {"message": "Bookmark saved", "key": key, "position": req.position}
+    return {"message": "Bookmark saved", "user": req.user, "book": req.book, "position": req.position}
 
-# Get bookmark
+
 @app.post("/get")
 def get_bookmark(req: ReadRequest):
+    """Retrieve a bookmark for a user + book"""
     with open(BOOKMARK_FILE, "r") as f:
         bookmarks = json.load(f)
 
-    key = f"{req.user}_{req.book}"
+    key = f"{req.user}:{req.book}"
     position = bookmarks.get(key)
 
     if position is None:
@@ -65,13 +62,12 @@ def get_bookmark(req: ReadRequest):
 
     return {"user": req.user, "book": req.book, "position": position}
 
-# Generate speech
+
 @app.post("/speak")
-def speak_text(req: ReadRequest):
-    text = f"{req.user}, your last position in {req.book} is saved."
-    tts = gTTS(text)
-    filename = f"{req.user}_{req.book}.mp3"
+def speak_text(req: SpeakRequest):
+    """Convert text to speech"""
+    tts = gTTS(req.text)
+    filename = f"speech_{datetime.now().timestamp()}.mp3"
     tts.save(filename)
 
-    return {"message": "Audio generated", "file": filename}
-
+    return {"message": "Speech generated", "file": filename}
