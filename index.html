@@ -5,40 +5,53 @@
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
     button { font-size: 24px; padding: 20px; margin: 10px; }
+    audio { margin-top: 20px; width: 300px; }
   </style>
 </head>
 <body>
   <h1>📖 Spoken Bookmark</h1>
-  <p>Press the <b>spacebar</b> or tap the button below to toggle Stop/Resume.</p>
+  <p>Press the <b>spacebar</b> or tap the button to Stop/Resume reading.</p>
 
   <button id="toggleButton">⏯️ Stop / Resume</button>
 
-  <script>
-    let isReading = true; // Start as reading
-    const user = "john";   // Replace with real username
-    const book = "Bible";  // Replace with real book
+  <audio id="player" controls></audio>
 
-    function sendCommand(command) {
-      fetch("https://audible-bookmark-api.onrender.com/command", {
+  <script>
+    let isReading = false; 
+    const user = "john";   // test user
+    const book = "Bible";  // test book
+    const player = document.getElementById("player");
+
+    function playAudioFromAPI(endpoint, payload) {
+      fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: user, book: book, command: command })
+        body: JSON.stringify(payload)
       })
-      .then(res => {
-        if (res.ok) {
-          console.log("Command sent:", command);
-        } else {
-          console.error("Failed to send:", command);
-        }
-      });
+      .then(response => {
+        if (!response.ok) throw new Error("API error");
+        return response.blob();
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        player.src = url;
+        player.play();
+      })
+      .catch(err => console.error(err));
     }
 
     function toggleCommand() {
       if (isReading) {
-        sendCommand("STOP");
+        // STOP
+        playAudioFromAPI("https://audible-bookmark-api.onrender.com/stop", {
+          user: user, book: book, chapter: 1, paragraph: 1, sentence: 1
+        });
         isReading = false;
       } else {
-        sendCommand("RESUME");
+        // RESUME
+        playAudioFromAPI("https://audible-bookmark-api.onrender.com/command", {
+          user: user, book: book, command: "RESUME"
+        });
         isReading = true;
       }
     }
@@ -50,7 +63,7 @@
     document.addEventListener("keydown", function(event) {
       if (event.code === "Space") {
         toggleCommand();
-        event.preventDefault(); // prevent page scroll
+        event.preventDefault(); 
       }
     });
   </script>
