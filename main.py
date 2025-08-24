@@ -30,7 +30,7 @@ Base.metadata.create_all(bind=engine)
 # ======================
 # FastAPI app
 # ======================
-app = FastAPI()
+app = FastAPI(title="Spoken API")
 
 class SaveRequest(BaseModel):
     user: str
