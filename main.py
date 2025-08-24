@@ -1,14 +1,15 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from gtts import gTTS
-from fastapi.responses import FileResponse
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
+from gtts import gTTS
 
-# Database setup (Render will give you DATABASE_URL)
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")  # fallback to local sqlite
+# Get database URL from environment
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Setup database engine
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -20,55 +21,58 @@ class Bookmark(Base):
     user = Column(String, index=True)
     book = Column(String, index=True)
     position = Column(Integer)
+    text = Column(Text, nullable=True)
 
+# Create tables
 Base.metadata.create_all(bind=engine)
 
 # FastAPI app
 app = FastAPI()
 
-# Request models
+# Pydantic models
 class SaveRequest(BaseModel):
     user: str
     book: str
     position: int
+    text: str = None
 
-class ReadRequest(BaseModel):
+class GetRequest(BaseModel):
     user: str
     book: str
 
 class SpeakRequest(BaseModel):
     text: str
 
-# Save bookmark
+# Endpoints
 @app.post("/save")
 def save_bookmark(request: SaveRequest):
     db = SessionLocal()
-    bookmark = db.query(Bookmark).filter(Bookmark.user == request.user, Bookmark.book == request.book).first()
+    bookmark = db.query(Bookmark).filter_by(user=request.user, book=request.book).first()
     if bookmark:
         bookmark.position = request.position
+        bookmark.text = request.text
     else:
-        bookmark = Bookmark(user=request.user, book=request.book, position=request.position)
+        bookmark = Bookmark(user=request.user, book=request.book, position=request.position, text=request.text)
         db.add(bookmark)
     db.commit()
     db.refresh(bookmark)
     db.close()
-    return {"message": "Bookmark saved", "user": bookmark.user, "book": bookmark.book, "position": bookmark.position}
+    return {"message": "Bookmark saved", "user": request.user, "book": request.book, "position": request.position}
 
-# Get bookmark
 @app.post("/get")
-def get_bookmark(request: ReadRequest):
+def get_bookmark(request: GetRequest):
     db = SessionLocal()
-    bookmark = db.query(Bookmark).filter(Bookmark.user == request.user, Bookmark.book == request.book).first()
+    bookmark = db.query(Bookmark).filter_by(user=request.user, book=request.book).first()
     db.close()
     if not bookmark:
         return {"message": "No bookmark found"}
-    return {"user": bookmark.user, "book": bookmark.book, "position": bookmark.position}
+    return {"user": bookmark.user, "book": bookmark.book, "position": bookmark.position, "text": bookmark.text}
 
-# Speak text
 @app.post("/speak")
 def speak_text(request: SpeakRequest):
-    filename = "speech.mp3"
-    tts = gTTS(text=request.text, lang="en")
+    if not request.text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    filename = "spoken.mp3"
+    tts = gTTS(request.text)
     tts.save(filename)
-    return FileResponse(filename, media_type="audio/mpeg", filename=filename)
-
+    return {"message": "Text converted to speech", "file": filename}
